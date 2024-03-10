@@ -23,17 +23,9 @@ private slots:
 
 private:
     void createActions();
-    void createMenus();
     bool promptSave();
     void setFileName(const QString &fileName);
     bool saveFile(const QString &fileName);
-
-    QMenu *fileMenu;
-    QAction *newAct;
-    QAction *openAct;
-    QAction *saveAct;
-    QAction *saveAsAct;
-    QAction *exitAct;
 
     QString mFileName;
 

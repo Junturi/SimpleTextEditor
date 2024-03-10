@@ -13,7 +13,6 @@ MainWindow::MainWindow()
     setCentralWidget(widget);
 
     createActions();
-    createMenus();
 
     setMinimumSize(160, 160);
     resize(1000, 800);
@@ -52,6 +51,7 @@ void MainWindow::open()
         }
         QTextStream in(&file);
         textEdit->setPlainText(in.readAll());
+        textEdit->document()->setModified(false);
         qDebug() << "File name " << mFileName << " opened";
     }
 }
@@ -79,51 +79,76 @@ bool MainWindow::saveAs()
     if (dialog.exec() != QDialog::Accepted)
         return false;
 
-    return saveFile(dialog.selectedFiles().first());
+    auto selectedFiles = dialog.selectedFiles();
+    return saveFile(selectedFiles.first());
 }
 
 void MainWindow::createActions()
 {
-    newAct = new QAction(tr("&New"), this);
+    QMenu *fileMenu = menuBar()->addMenu(tr("&File"));
+
+    QAction *newAct = new QAction(tr("&New"), this);
     newAct->setShortcuts(QKeySequence::New);
     newAct->setStatusTip(tr("Create a new file"));
     connect(newAct, &QAction::triggered, this, &MainWindow::newFile);
+    fileMenu->addAction(newAct);
 
-    openAct = new QAction(tr("&Open"), this);
+    QAction *openAct = new QAction(tr("&Open"), this);
     openAct->setShortcuts(QKeySequence::Open);
     openAct->setStatusTip(tr("Open a file"));
     connect(openAct, &QAction::triggered, this, &MainWindow::open);
+    fileMenu->addAction(openAct);
 
-    saveAct = new QAction(tr("&Save"), this);
+    QAction *saveAct = new QAction(tr("&Save"), this);
     saveAct->setShortcuts(QKeySequence::Save);
     saveAct->setStatusTip(tr("Save file"));
     connect(saveAct, &QAction::triggered, this, &MainWindow::save);
+    fileMenu->addAction(saveAct);
 
-    saveAsAct = new QAction(tr("Save As..."), this);
+    QAction *saveAsAct = new QAction(tr("Save As..."), this);
     saveAsAct->setShortcuts(QKeySequence::SaveAs);
     saveAsAct->setStatusTip(tr("Save File As..."));
     connect(saveAsAct, &QAction::triggered, this, &MainWindow::saveAs);
+    fileMenu->addAction(saveAsAct);
 
-    exitAct = new QAction(tr("Exit"), this);
+    QAction *exitAct = new QAction(tr("Exit"), this);
     exitAct->setShortcuts(QKeySequence::Quit);
     exitAct->setStatusTip(tr("Exit"));
     connect(exitAct, &QAction::triggered, this, &QCoreApplication::quit, Qt::QueuedConnection);
-}
-
-void MainWindow::createMenus()
-{
-    fileMenu = menuBar()->addMenu(tr("&File"));
-    fileMenu->addAction(newAct);
-    fileMenu->addAction(openAct);
-    fileMenu->addAction(saveAct);
-    fileMenu->addAction(saveAsAct);
     fileMenu->addSeparator();
     fileMenu->addAction(exitAct);
+
+    QMenu *editMenu = menuBar()->addMenu(tr("&Edit"));
+
+    QAction *cutAct = new QAction(tr("&Cut"), this);
+    cutAct->setShortcuts(QKeySequence::Cut);
+    cutAct->setStatusTip(tr("Cut"));
+    connect(cutAct, &QAction::triggered, textEdit, &QPlainTextEdit::cut);
+    editMenu->addAction(cutAct);
+
+    QAction *copyAct = new QAction(tr("&Copy"), this);
+    copyAct->setShortcuts(QKeySequence::Copy);
+    copyAct->setStatusTip(tr("Copy"));
+    connect(copyAct, &QAction::triggered, textEdit, &QPlainTextEdit::copy);
+    editMenu->addAction(copyAct);
+
+    QAction *pasteAct = new QAction(tr("&Paste"), this);
+    pasteAct->setShortcuts(QKeySequence::Paste);
+    pasteAct->setStatusTip(tr("Paste"));
+    connect(pasteAct, &QAction::triggered, textEdit, &QPlainTextEdit::paste);
+    editMenu->addAction(pasteAct);
+
+#ifndef QT_NO_CLIPBOARD
+    cutAct->setEnabled(false);
+    copyAct->setEnabled(false);
+    connect(textEdit, &QPlainTextEdit::copyAvailable, cutAct, &QAction::setEnabled);
+    connect(textEdit, &QPlainTextEdit::copyAvailable, copyAct, &QAction::setEnabled);
+#endif // !QT_NO_CLIPBOARD
+
 }
 
 bool MainWindow::promptSave()
 {
-    qDebug() << "Document has been modified, prompt to save";
     if (!textEdit->document()->isModified())
         return true;
     const QMessageBox::StandardButton ret
@@ -144,6 +169,7 @@ bool MainWindow::promptSave()
 
 void MainWindow::setFileName(const QString &currentFile)
 {
+    qDebug() << "Setting the file name from " << mFileName << " to " << currentFile;
     mFileName = currentFile;
 }
 
@@ -156,6 +182,7 @@ bool MainWindow::saveFile(const QString &fileName)
     if (file.open(QFile::WriteOnly | QFile::Text)) {
         QTextStream out(&file);
         out << textEdit->toPlainText();
+        textEdit->document()->setModified(false);
         if (!file.commit()) {
             errorMessage = tr("Cannot write file %1:\n%2.")
                               .arg(QDir::toNativeSeparators(fileName), file.errorString());
